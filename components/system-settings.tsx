@@ -4,6 +4,7 @@ import { useState } from "react"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
+import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Database, Key, Mail, Shield } from "lucide-react"
@@ -15,20 +16,20 @@ export function SystemSettings() {
     maxFileSize: "20",
     maxFilesPerUser: "50",
     ocrEnabled: true,
-    
+
     // Email Settings
     smtpHost: "smtp.gmail.com",
     smtpPort: "587",
     smtpUser: "noreply@examace.com",
     smtpPassword: "**********************",
     emailNotifications: true,
-    
+
     // Security Settings
     sessionTimeout: "24",
     maxLoginAttempts: "5",
     requireEmailVerification: true,
     enableTwoFactor: false,
-    
+
     // System Settings
     maintenanceMode: false,
     debugMode: false,
@@ -213,4 +214,100 @@ export function SystemSettings() {
                 </div>
               </div>
 
-              <div className="flex\
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Email Verification Required</Label>
+                  <p className="text-xs text-muted-foreground">Require email verification for new accounts</p>
+                </div>
+                <Switch
+                  checked={settings.requireEmailVerification}
+                  onCheckedChange={(checked) => updateSetting("requireEmailVerification", checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Two-Factor Authentication</Label>
+                  <p className="text-xs text-muted-foreground">Enable 2FA for enhanced security</p>
+                </div>
+                <Switch
+                  checked={settings.enableTwoFactor}
+                  onCheckedChange={(checked) => updateSetting("enableTwoFactor", checked)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="system">
+          <Card>
+            <CardHeader>
+              <CardTitle>System Configuration</CardTitle>
+              <CardDescription>Configure system-wide settings and maintenance options</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="logLevel">Log Level</Label>
+                  <select
+                    id="logLevel"
+                    value={settings.logLevel}
+                    onChange={(e) => updateSetting("logLevel", e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="error">Error</option>
+                    <option value="warn">Warning</option>
+                    <option value="info">Info</option>
+                    <option value="debug">Debug</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="backupFreq">Backup Frequency</Label>
+                  <select
+                    id="backupFreq"
+                    value={settings.backupFrequency}
+                    onChange={(e) => updateSetting("backupFrequency", e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="hourly">Hourly</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Maintenance Mode</Label>
+                  <p className="text-xs text-muted-foreground">Enable maintenance mode to restrict access</p>
+                </div>
+                <Switch
+                  checked={settings.maintenanceMode}
+                  onCheckedChange={(checked) => updateSetting("maintenanceMode", checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>Debug Mode</Label>
+                  <p className="text-xs text-muted-foreground">Enable debug logging and error details</p>
+                </div>
+                <Switch
+                  checked={settings.debugMode}
+                  onCheckedChange={(checked) => updateSetting("debugMode", checked)}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <div className="flex justify-end">
+        <Button onClick={handleSave} disabled={isSaving}>
+          {isSaving ? "Saving..." : "Save Settings"}
+        </Button>
+      </div>
+    </div>
+  )
+}

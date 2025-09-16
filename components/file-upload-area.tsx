@@ -12,6 +12,7 @@ interface FileUploadAreaProps {
   fileType: "syllabus" | "pyq"
   maxFiles: number
   maxSize: number
+  onUpload?: () => void
 }
 
 interface UploadedFile {
@@ -22,7 +23,7 @@ interface UploadedFile {
   error?: string
 }
 
-export function FileUploadArea({ accept, fileType, maxFiles, maxSize }: FileUploadAreaProps) {
+export function FileUploadArea({ accept, fileType, maxFiles, maxSize, onUpload }: FileUploadAreaProps) {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
@@ -53,6 +54,9 @@ export function FileUploadArea({ accept, fileType, maxFiles, maxSize }: FileUplo
             } else if (file.status === "processing") {
               // Simulate random success/error
               const success = Math.random() > 0.2
+              if (success && onUpload) {
+                onUpload()
+              }
               return {
                 ...file,
                 status: success ? "completed" : "error",
