@@ -12,7 +12,8 @@ interface FileUploadAreaProps {
   fileType: "syllabus" | "pyq"
   maxFiles: number
   maxSize: number
-  onUpload?: () => void
+  sessionId?: string
+  onUpload?: (files: any[]) => void
 }
 
 interface UploadedFile {
@@ -21,55 +22,97 @@ interface UploadedFile {
   status: "uploading" | "processing" | "completed" | "error"
   progress: number
   error?: string
+  uploadedData?: any
 }
 
-export function FileUploadArea({ accept, fileType, maxFiles, maxSize, onUpload }: FileUploadAreaProps) {
+export function FileUploadArea({ accept, fileType, maxFiles, maxSize, sessionId, onUpload }: FileUploadAreaProps) {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    const newFiles = acceptedFiles.map((file) => ({
-      id: Math.random().toString(36).substr(2, 9),
-      file,
-      status: "uploading" as const,
-      progress: 0,
-    }))
+  const onDrop = useCallback(
+    (acceptedFiles: File[]) => {
+      const newFiles = acceptedFiles.map((file) => ({
+        id: Math.random().toString(36).substr(2, 9),
+        file,
+        status: "uploading" as const,
+        progress: 0,
+      }))
 
-    setUploadedFiles((prev) => [...prev, ...newFiles])
+      setUploadedFiles((prev) => [...prev, ...newFiles])
 
-    // Simulate file upload and processing
-    newFiles.forEach((uploadedFile) => {
-      simulateUpload(uploadedFile.id)
-    })
-  }, [])
+      // Upload files to Supabase
+      newFiles.forEach((uploadedFile) => {
+        uploadToSupabase(uploadedFile.id, uploadedFile.file)
+      })
+    },
+    [sessionId],
+  )
 
-  const simulateUpload = (fileId: string) => {
-    const interval = setInterval(() => {
+  const uploadToSupabase = async (fileId: string, file: File) => {
+    try {
+      const formData = new FormData()
+      formData.append("files", file)
+      if (sessionId) {
+        formData.append("sessionId", sessionId)
+      }
+
+      // Simulate progress updates
+      const progressInterval = setInterval(() => {
+        setUploadedFiles((prev) =>
+          prev.map((f) => {
+            if (f.id === fileId && f.progress < 90) {
+              return { ...f, progress: f.progress + 10 }
+            }
+            return f
+          }),
+        )
+      }, 200)
+
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      })
+
+      clearInterval(progressInterval)
+
+      if (!response.ok) {
+        throw new Error("Upload failed")
+      }
+
+      const result = await response.json()
+
       setUploadedFiles((prev) =>
-        prev.map((file) => {
-          if (file.id === fileId) {
-            if (file.progress < 100) {
-              return { ...file, progress: file.progress + 10 }
-            } else if (file.status === "uploading") {
-              return { ...file, status: "processing" }
-            } else if (file.status === "processing") {
-              // Simulate random success/error
-              const success = Math.random() > 0.2
-              if (success && onUpload) {
-                onUpload()
-              }
-              return {
-                ...file,
-                status: success ? "completed" : "error",
-                error: success ? undefined : "Failed to process file",
-              }
+        prev.map((f) => {
+          if (f.id === fileId) {
+            return {
+              ...f,
+              status: "completed",
+              progress: 100,
+              uploadedData: result.files?.[0],
             }
           }
-          return file
+          return f
         }),
       )
-    }, 500)
 
-    setTimeout(() => clearInterval(interval), 6000)
+      // Call onUpload callback with uploaded files
+      if (onUpload && result.files) {
+        onUpload(result.files)
+      }
+    } catch (error) {
+      console.error("Upload error:", error)
+      setUploadedFiles((prev) =>
+        prev.map((f) => {
+          if (f.id === fileId) {
+            return {
+              ...f,
+              status: "error",
+              error: error instanceof Error ? error.message : "Upload failed",
+            }
+          }
+          return f
+        }),
+      )
+    }
   }
 
   const removeFile = (fileId: string) => {
@@ -124,12 +167,16 @@ export function FileUploadArea({ accept, fileType, maxFiles, maxSize, onUpload }
                 {uploadedFile.status === "uploading" && (
                   <div className="mt-2">
                     <Progress value={uploadedFile.progress} className="h-2" />
-                    <p className="text-xs text-muted-foreground mt-1">Uploading...</p>
+                    <p className="text-xs text-muted-foreground mt-1">Uploading to cloud...</p>
                   </div>
                 )}
 
                 {uploadedFile.status === "processing" && (
-                  <p className="text-xs text-accent mt-1">Processing with OCR...</p>
+                  <p className="text-xs text-accent mt-1">Processing with AI...</p>
+                )}
+
+                {uploadedFile.status === "completed" && (
+                  <p className="text-xs text-green-600 mt-1">Upload successful</p>
                 )}
 
                 {uploadedFile.status === "error" && (

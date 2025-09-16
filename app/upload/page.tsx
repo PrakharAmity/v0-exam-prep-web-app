@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Sidebar } from "@/components/sidebar"
 import { FileUploadArea } from "@/components/file-upload-area"
 import { UploadedFilesList } from "@/components/uploaded-files-list"
@@ -28,16 +28,110 @@ import {
 
 export default function UploadPage() {
   const [showAnalysis, setShowAnalysis] = useState(false)
-  const [uploadedFiles, setUploadedFiles] = useState(0)
+  const [uploadedFiles, setUploadedFiles] = useState<any[]>([])
+  const [currentSession, setCurrentSession] = useState<any>(null)
+  const [analysisData, setAnalysisData] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(false)
 
-  // Mock function to simulate file upload completion
-  const handleFilesUploaded = () => {
-    setUploadedFiles((prev) => prev + 1)
-    // Show analysis after first file is uploaded
-    if (uploadedFiles === 0) {
-      setTimeout(() => setShowAnalysis(true), 2000) // Simulate processing time
+  // Create a new session when component mounts
+  useEffect(() => {
+    createNewSession()
+  }, [])
+
+  const createNewSession = async () => {
+    try {
+      const response = await fetch("/api/sessions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: "New Study Session",
+          examType: "practice",
+        }),
+      })
+
+      if (response.ok) {
+        const { session } = await response.json()
+        setCurrentSession(session)
+      }
+    } catch (error) {
+      console.error("Failed to create session:", error)
     }
   }
+
+  const handleFilesUploaded = async (files: any[]) => {
+    setUploadedFiles((prev) => [...prev, ...files])
+    setIsLoading(true)
+
+    // Simulate AI analysis and save results to database
+    try {
+      // Generate mock analysis data
+      const mockAnalysisData = {
+        topicsIdentified: 24,
+        questionsMapped: 156,
+        highPriorityTopics: 8,
+        predictionAccuracy: 87,
+        topicPriority: [
+          { name: "Data Structures", score: 95, questions: 18 },
+          { name: "Algorithms", score: 92, questions: 15 },
+          { name: "Database Systems", score: 88, questions: 12 },
+          { name: "Operating Systems", score: 85, questions: 14 },
+          { name: "Computer Networks", score: 82, questions: 10 },
+        ],
+      }
+
+      // Save analysis results to database
+      for (const file of files) {
+        await fetch("/api/analysis", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            sessionId: currentSession?.id,
+            fileId: file.id,
+            analysisType: "topic_priority",
+            analysisData: mockAnalysisData,
+            confidenceScore: 0.87,
+          }),
+        })
+      }
+
+      setAnalysisData(mockAnalysisData)
+      setTimeout(() => {
+        setIsLoading(false)
+        setShowAnalysis(true)
+      }, 3000) // Simulate processing time
+    } catch (error) {
+      console.error("Analysis failed:", error)
+      setIsLoading(false)
+    }
+  }
+
+  const loadAnalysisData = async () => {
+    if (!currentSession) return
+
+    try {
+      const response = await fetch(`/api/analysis?sessionId=${currentSession.id}`)
+      if (response.ok) {
+        const { analyses } = await response.json()
+        if (analyses.length > 0) {
+          setAnalysisData(analyses[0].analysis_data)
+          setShowAnalysis(true)
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load analysis:", error)
+    }
+  }
+
+  // Load existing analysis when session is available
+  useEffect(() => {
+    if (currentSession) {
+      loadAnalysisData()
+    }
+  }, [currentSession])
 
   return (
     <div className="min-h-screen bg-background">
@@ -77,6 +171,7 @@ export default function UploadPage() {
                         fileType="syllabus"
                         maxFiles={5}
                         maxSize={10 * 1024 * 1024} // 10MB
+                        sessionId={currentSession?.id}
                         onUpload={handleFilesUploaded}
                       />
                     </CardContent>
@@ -100,6 +195,7 @@ export default function UploadPage() {
                         fileType="pyq"
                         maxFiles={20}
                         maxSize={20 * 1024 * 1024} // 20MB
+                        sessionId={currentSession?.id}
                         onUpload={handleFilesUploaded}
                       />
                     </CardContent>
@@ -159,15 +255,15 @@ export default function UploadPage() {
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
                           <span className="text-sm">Files Uploaded</span>
-                          <span className="text-sm font-medium">0</span>
+                          <span className="text-sm font-medium">{uploadedFiles.length}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm">OCR Processing</span>
-                          <span className="text-sm font-medium">0</span>
+                          <span className="text-sm font-medium">{uploadedFiles.length}</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <span className="text-sm">Ready for Analysis</span>
-                          <span className="text-sm font-medium">0</span>
+                          <span className="text-sm font-medium">{uploadedFiles.length}</span>
                         </div>
                       </div>
                     </CardContent>
@@ -180,7 +276,7 @@ export default function UploadPage() {
                 <UploadedFilesList />
               </div>
 
-              {uploadedFiles > 0 && (
+              {isLoading && (
                 <Card className="mt-6">
                   <CardContent className="pt-6">
                     <div className="flex items-center justify-center space-x-4">
@@ -214,7 +310,7 @@ export default function UploadPage() {
                       <Download className="h-4 w-4 mr-2" />
                       Export Report
                     </Button>
-                    <Button size="sm">
+                    <Button size="sm" onClick={loadAnalysisData}>
                       <RefreshCw className="h-4 w-4 mr-2" />
                       Re-analyze
                     </Button>
@@ -230,8 +326,8 @@ export default function UploadPage() {
                     <BarChart3 className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">24</div>
-                    <p className="text-xs text-muted-foreground">From 3 syllabus files</p>
+                    <div className="text-2xl font-bold">{analysisData?.topicsIdentified || 0}</div>
+                    <p className="text-xs text-muted-foreground">From {uploadedFiles.length} files</p>
                   </CardContent>
                 </Card>
 
@@ -241,8 +337,8 @@ export default function UploadPage() {
                     <PieChart className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">156</div>
-                    <p className="text-xs text-muted-foreground">From 8 PYQ files</p>
+                    <div className="text-2xl font-bold">{analysisData?.questionsMapped || 0}</div>
+                    <p className="text-xs text-muted-foreground">From uploaded PYQs</p>
                   </CardContent>
                 </Card>
 
@@ -252,7 +348,7 @@ export default function UploadPage() {
                     <Target className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">8</div>
+                    <div className="text-2xl font-bold">{analysisData?.highPriorityTopics || 0}</div>
                     <p className="text-xs text-muted-foreground">Above 80% priority score</p>
                   </CardContent>
                 </Card>
@@ -263,7 +359,7 @@ export default function UploadPage() {
                     <TrendingUp className="h-4 w-4 text-muted-foreground" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">87%</div>
+                    <div className="text-2xl font-bold">{analysisData?.predictionAccuracy || 0}%</div>
                     <p className="text-xs text-muted-foreground">Based on historical data</p>
                   </CardContent>
                 </Card>
@@ -299,13 +395,7 @@ export default function UploadPage() {
                           <CardDescription>Must-study topics for your exam</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                          {[
-                            { name: "Data Structures", score: 95, questions: 18 },
-                            { name: "Algorithms", score: 92, questions: 15 },
-                            { name: "Database Systems", score: 88, questions: 12 },
-                            { name: "Operating Systems", score: 85, questions: 14 },
-                            { name: "Computer Networks", score: 82, questions: 10 },
-                          ].map((topic, index) => (
+                          {(analysisData?.topicPriority || []).map((topic: any, index: number) => (
                             <div key={topic.name} className="flex items-center justify-between p-3 border rounded-lg">
                               <div className="flex items-center space-x-3">
                                 <div className="w-8 h-8 rounded-full bg-accent text-accent-foreground flex items-center justify-center text-sm font-medium">
